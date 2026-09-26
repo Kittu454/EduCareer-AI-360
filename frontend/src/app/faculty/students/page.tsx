@@ -1,0 +1,78 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { Users, Search } from 'lucide-react';
+import { DashboardLayout } from '../../../components/layout/DashboardLayout';
+import { Card } from '../../../components/ui/Card';
+import { Input } from '../../../components/ui/Input';
+import { Badge } from '../../../components/ui/Badge';
+import { apiFetch } from '../../../lib/api';
+import { Student } from '../../../types';
+
+export default function FacultyStudentsPage() {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  async function loadStudents(query = '') {
+    const res = await apiFetch<Student[]>(`/students?search=${encodeURIComponent(query)}`);
+    if (res.success && res.data) setStudents(res.data);
+  }
+
+  return (
+    <DashboardLayout title="Department Student Roster" subtitle="Academic performance monitoring for assigned department cohorts.">
+      <div className="space-y-6">
+        <Card>
+          <Input
+            placeholder="Search student name or roll number..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              loadStudents(e.target.value);
+            }}
+            icon={<Search className="w-4 h-4" />}
+          />
+        </Card>
+
+        <Card title="Department Students" subtitle="Candidate academic status">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-600">
+              <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="p-3">Student Name</th>
+                  <th className="p-3">Roll Number</th>
+                  <th className="p-3">Department</th>
+                  <th className="p-3">Admission Year</th>
+                  <th className="p-3">Current CGPA</th>
+                  <th className="p-3">Academic Risk</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {students.map((s) => {
+                  const gpa = Number(s.currentGpa);
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50/50">
+                      <td className="p-3 font-bold text-slate-900">{s.firstName} {s.lastName}</td>
+                      <td className="p-3 font-mono">{s.rollNumber}</td>
+                      <td className="p-3">{s.department?.name || 'Computer Science'}</td>
+                      <td className="p-3">{s.admissionYear}</td>
+                      <td className="p-3 font-bold text-blue-600">{gpa.toFixed(2)}</td>
+                      <td className="p-3">
+                        <Badge variant={gpa >= 7.5 ? 'success' : gpa >= 6.5 ? 'info' : 'warning'}>
+                          {gpa >= 7.5 ? 'GOOD_STANDING' : gpa >= 6.5 ? 'MODERATE' : 'AT_RISK'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}

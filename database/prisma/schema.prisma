@@ -1,0 +1,637 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../backend/node_modules/.prisma/client"
+}
+
+model User {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  status        String         @default("ACTIVE")
+  emailVerifiedAt DateTime?    @map("email_verified_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
+  
+  student       Student?
+  faculty       Faculty?
+  tpoOfficer    TpoOfficer?
+  userRoles     UserRole[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  reports       Report[]
+  refreshSessions RefreshSession[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model RefreshSession {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_sessions")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Role {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Department {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @unique
+  code      String    @unique
+  students  Student[]
+  faculty   Faculty[]
+  subjects  Subject[]
+
+  @@map("departments")
+}
+
+model Institution {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String      @unique
+  code        String      @unique
+  students    Student[]
+  faculty     Faculty[]
+  tpoOfficers TpoOfficer[]
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@map("institutions")
+}
+
+model Student {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String         @unique @map("user_id") @db.Uuid
+  firstName      String         @map("first_name")
+  lastName       String         @map("last_name")
+  rollNumber     String         @unique @map("roll_number")
+  departmentId   String?        @map("department_id") @db.Uuid
+  admissionYear  Int            @map("admission_year")
+  graduationYear Int?           @map("graduation_year")
+  institutionId  String?        @map("institution_id") @db.Uuid
+  currentGpa     Decimal        @default(0.00) @map("current_gpa") @db.Decimal(4, 2)
+  
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department     Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  institution    Institution?   @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  
+  academicRecords       AcademicRecord[]
+  attendance            Attendance[]
+  assessmentResults     AssessmentResult[]
+  studentSkills         StudentSkill[]
+  careerRecommendations CareerRecommendation[]
+  skillGaps             SkillGap[]
+  careerRoadmap         CareerRoadmap?
+  jobMatches            JobMatch[]
+  applications          JobApplication[]
+  resumes               Resume[]
+  placementReadiness    PlacementReadiness?
+  aiConversations       AiConversation[]
+  internships           Internship[]
+  certifications        Certification[]
+
+  @@map("students")
+}
+
+model Faculty {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String             @unique @map("user_id") @db.Uuid
+  firstName    String             @map("first_name")
+  lastName     String             @map("last_name")
+  employeeId   String             @unique @map("employee_id")
+  departmentId String?            @map("department_id") @db.Uuid
+  institutionId String?           @map("institution_id") @db.Uuid
+  
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  institution  Institution?      @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  
+  verifiedSkills SkillAssessment[]
+
+  @@map("faculty")
+}
+
+model TpoOfficer {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String  @unique @map("user_id") @db.Uuid
+  firstName   String  @map("first_name")
+  lastName    String  @map("last_name")
+  officePhone String? @map("office_phone")
+  institutionId String? @map("institution_id") @db.Uuid
+  
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  @@map("tpo_officers")
+}
+
+model Semester {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String           @unique
+  name            String
+  startDate       DateTime         @map("start_date")
+  endDate         DateTime         @map("end_date")
+  
+  academicRecords AcademicRecord[]
+  attendance      Attendance[]
+  assessments     Assessment[]
+
+  @@map("semesters")
+}
+
+model Subject {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String           @unique
+  name            String
+  credits         Int
+  departmentId    String           @map("department_id") @db.Uuid
+  department      Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  
+  academicRecords AcademicRecord[]
+  attendance      Attendance[]
+  assessments     Assessment[]
+
+  @@map("subjects")
+}
+
+model AcademicRecord {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  subjectId   String   @map("subject_id") @db.Uuid
+  semesterId  String   @map("semester_id") @db.Uuid
+  gradePoints Decimal  @map("grade_points") @db.Decimal(4, 2)
+  letterGrade String   @map("letter_grade")
+  
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  semester    Semester @relation(fields: [semesterId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, subjectId, semesterId])
+  @@map("academic_records")
+}
+
+model Attendance {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId        String   @map("student_id") @db.Uuid
+  subjectId        String   @map("subject_id") @db.Uuid
+  semesterId       String   @map("semester_id") @db.Uuid
+  totalSessions    Int      @default(0) @map("total_sessions")
+  attendedSessions Int      @default(0) @map("attended_sessions")
+  
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject          Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  semester         Semester @relation(fields: [semesterId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, subjectId, semesterId])
+  @@map("attendance")
+}
+
+model Assessment {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  subjectId   String             @map("subject_id") @db.Uuid
+  semesterId  String             @map("semester_id") @db.Uuid
+  maxMarks    Decimal            @map("max_marks") @db.Decimal(5, 2)
+  weightage   Decimal            @db.Decimal(4, 2)
+  
+  subject     Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  semester    Semester           @relation(fields: [semesterId], references: [id], onDelete: Restrict)
+  results     AssessmentResult[]
+
+  @@map("assessments")
+}
+
+model AssessmentResult {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assessmentId String     @map("assessment_id") @db.Uuid
+  studentId    String     @map("student_id") @db.Uuid
+  marksObtained Decimal    @map("marks_obtained") @db.Decimal(5, 2)
+  feedback     String?
+  
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, studentId])
+  @@map("assessment_results")
+}
+
+model Skill {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String        @unique
+  category     String
+  
+  studentSkills StudentSkill[]
+  careerSkills  CareerSkill[]
+  skillGaps     SkillGap[]
+  roadmapItems  RoadmapItem[]
+  jobSkills     JobSkill[]
+
+  @@map("skills")
+}
+
+model StudentSkill {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId        String            @map("student_id") @db.Uuid
+  skillId          String            @map("skill_id") @db.Uuid
+  proficiencyLevel String            @default("BEGINNER") @map("proficiency_level")
+  verified         Boolean           @default(false)
+  
+  student          Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  skill            Skill             @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  assessments      SkillAssessment[]
+
+  @@unique([studentId, skillId])
+  @@map("student_skills")
+}
+
+model SkillAssessment {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentSkillId String       @map("student_skill_id") @db.Uuid
+  assessmentType String       @map("assessment_type")
+  score          Decimal?     @db.Decimal(5, 2)
+  certificateUrl String?      @map("certificate_url")
+  verifiedBy     String?      @map("verified_by") @db.Uuid
+  verifiedAt     DateTime?    @map("verified_at")
+  
+  studentSkill   StudentSkill @relation(fields: [studentSkillId], references: [id], onDelete: Cascade)
+  verifier       Faculty?     @relation(fields: [verifiedBy], references: [id], onDelete: SetNull)
+
+  @@map("skill_assessments")
+}
+
+model Career {
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title              String                 @unique
+  description        String?
+  minGpaRequirement  Decimal                @default(0.00) @map("min_gpa_requirement") @db.Decimal(4, 2)
+  
+  careerSkills       CareerSkill[]
+  recommendations    CareerRecommendation[]
+
+  @@map("careers")
+}
+
+model CareerSkill {
+  careerId         String  @map("career_id") @db.Uuid
+  skillId          String  @map("skill_id") @db.Uuid
+  importanceWeight Decimal @map("importance_weight") @db.Decimal(3, 2)
+  
+  career           Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  skill            Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([careerId, skillId])
+  @@map("career_skills")
+}
+
+model CareerRecommendation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId       String   @map("student_id") @db.Uuid
+  careerId        String   @map("career_id") @db.Uuid
+  matchPercentage Decimal  @map("match_percentage") @db.Decimal(5, 2)
+  rationale       String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  career          Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, careerId])
+  @@map("career_recommendations")
+}
+
+model SkillGap {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId String  @map("student_id") @db.Uuid
+  skillId   String  @map("skill_id") @db.Uuid
+  priority  String  @default("MEDIUM")
+  
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, skillId])
+  @@map("skill_gaps")
+}
+
+model CareerRoadmap {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId    String        @unique @map("student_id") @db.Uuid
+  targetCareer String        @map("target_career")
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at")
+  
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  items        RoadmapItem[]
+
+  @@map("career_roadmaps")
+}
+
+model RoadmapItem {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roadmapId     String        @map("roadmap_id") @db.Uuid
+  skillId       String        @map("skill_id") @db.Uuid
+  title         String
+  sequenceOrder Int           @map("sequence_order")
+  status        String        @default("LOCKED")
+  resourceUrl   String?       @map("resource_url")
+  
+  roadmap       CareerRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  skill         Skill         @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@unique([roadmapId, sequenceOrder])
+  @@map("roadmap_items")
+}
+
+model Company {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name     String  @unique
+  website  String?
+  industry String?
+  jobs     Job[]
+  institutionId String? @map("institution_id") @db.Uuid
+
+  @@map("companies")
+}
+
+model Job {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String           @map("company_id") @db.Uuid
+  title               String
+  description         String
+  minGpa              Decimal          @default(0.00) @map("min_gpa") @db.Decimal(4, 2)
+  applicationDeadline DateTime         @map("application_deadline")
+  
+  company             Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobSkills           JobSkill[]
+  jobMatches          JobMatch[]
+  applications        JobApplication[]
+
+  @@map("jobs")
+}
+
+model JobSkill {
+  jobId   String @map("job_id") @db.Uuid
+  skillId String @map("skill_id") @db.Uuid
+  job     Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([jobId, skillId])
+  @@map("job_skills")
+}
+
+model JobMatch {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId  String  @map("student_id") @db.Uuid
+  jobId      String  @map("job_id") @db.Uuid
+  matchScore Decimal @map("match_score") @db.Decimal(5, 2)
+  ineligible Boolean @default(false)
+  
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  job        Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, jobId])
+  @@map("job_matches")
+}
+
+model JobApplication {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  jobId     String   @map("job_id") @db.Uuid
+  status    String   @default("SUBMITTED")
+  appliedAt DateTime @default(now()) @map("applied_at")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, jobId])
+  @@map("job_applications")
+}
+
+model Resume {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId  String          @map("student_id") @db.Uuid
+  fileName   String          @map("file_name")
+  storagePath String         @map("storage_path")
+  uploadedAt DateTime        @default(now()) @map("uploaded_at")
+    mimeType   String?         @map("mime_type")
+    fileSize   Int?            @map("file_size")
+    status     String           @default("UPLOADED")
+  
+  student    Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  analysis   ResumeAnalysis?
+
+  @@map("resumes")
+}
+
+model ResumeAnalysis {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resumeId        String  @unique @map("resume_id") @db.Uuid
+  overallScore    Decimal @map("overall_score") @db.Decimal(5, 2)
+  grammarFeedback String? @map("grammar_feedback")
+  extractedSkills Json    @default("[]") @map("extracted_skills")
+  recommendations String?
+  
+  resume          Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("resume_analyses")
+}
+
+model PlacementReadiness {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId      String       @unique @map("student_id") @db.Uuid
+  readinessScore Decimal      @default(0.00) @map("readiness_score") @db.Decimal(5, 2)
+  statusLabel    String       @default("ACTION_NEEDED") @map("status_label")
+  lastCalculated DateTime     @default(now()) @map("last_calculated")
+  
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  predictions    Prediction[]
+
+  @@map("placement_readiness")
+}
+
+model Prediction {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  readinessId  String             @map("readiness_id") @db.Uuid
+  score        Decimal            @db.Decimal(5, 2)
+  calculatedAt DateTime           @default(now()) @map("calculated_at")
+  
+  readiness    PlacementReadiness @relation(fields: [readinessId], references: [id], onDelete: Cascade)
+
+  @@map("predictions")
+}
+
+model AiConversation {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId String      @map("student_id") @db.Uuid
+  title     String      @default("New Conversation")
+  createdAt DateTime    @default(now()) @map("created_at")
+  
+  student   Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages  AiMessage[]
+
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String         @map("conversation_id") @db.Uuid
+  sender         String
+  messageText    String         @map("message_text")
+  sentAt         DateTime       @default(now()) @map("sent_at")
+  
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_messages")
+}
+
+model Notification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  content   String
+  notificationType String  @default("GENERAL") @map("notification_type")
+  priority  String  @default("NORMAL")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  metadata  Json?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Report {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generatedBy String?  @map("generated_by") @db.Uuid
+  title       String
+  filePath    String   @map("file_path")
+  reportType  String   @map("report_type")
+  format      String
+  status      String   @default("REQUESTED")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  generator   User?    @relation(fields: [generatedBy], references: [id], onDelete: SetNull)
+
+  @@map("reports")
+}
+
+model Internship {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId   String    @map("student_id") @db.Uuid
+  companyName String    @map("company_name")
+  role        String?
+  startDate   DateTime  @map("start_date")
+  endDate     DateTime? @map("end_date")
+  verified    Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@map("internships")
+}
+
+model Certification {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId     String    @map("student_id") @db.Uuid
+  name          String
+  issuer        String?
+  issuedAt      DateTime? @map("issued_at")
+  expiresAt     DateTime? @map("expires_at")
+  credentialUrl String?   @map("credential_url")
+  verified      Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@map("certifications")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  actionType String   @map("action_type")
+  tableName  String   @map("table_name")
+  recordId   String   @map("record_id") @db.Uuid
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
